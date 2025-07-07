@@ -1,76 +1,136 @@
-My platform to be created named "Bics" seams as follows : as a learning management system (LMS), has several key properties and features:
+# models.py
+from django.db import models
+from django.contrib.auth.models import AbstractUser
+from django.utils import timezone
 
-Core Functionality:
+class University(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    university_code = models.CharField(max_length=10, unique=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    
+    # Add other university-specific fields
+    def __str__(self):
+        return self.name
 
-⦁ Course Management: Creating and organizing courses, assigning course materials, scheduling assignments, and managing grades. This is the fundamental function.
-⦁ Communication Tools: Facilitating communication between instructors and students, such as announcements, discussion forums, email, and messaging systems.
-⦁ Content Delivery: Hosting course materials like documents, videos, presentations, and links. It often integrates with other content storage options.
-⦁ Assessment Management: Creating, distributing, and grading various types of assessments like quizzes, tests, essays, and projects. Tools for managing submissions and providing feedback are essential.
-⦁ Collaboration Tools: Providing forums, discussion boards, and sometimes wikis to encourage student collaboration.
-⦁ Learning Activities: Encouraging interaction and engagement through activities like interactive simulations, online discussions, and quizzes.
-⦁ Gradebook Integration: Centralized grade management, allowing instructors to easily record and track student performance. Different options exist for viewing and exporting grades.
+class CustomUser(AbstractUser):
+    ROLE_CHOICES = (
+        ('creator', 'Creator'),
+        ('admin', 'University Admin'),
+        ('teacher', 'Teacher'),
+        ('student', 'Student'),
+    )
+    
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    university = models.ForeignKey(University, on_delete=models.CASCADE, null=True, blank=True)
+    phone = models.CharField(max_length=15, blank=True)
+    requires_2fa = models.BooleanField(default=False)
+    
+    # Security flags
+    is_verified = models.BooleanField(default=False)
+    last_security_scan = models.DateTimeField(null=True)
 
-Other Important Properties:
+class Course(models.Model):
+    title = models.CharField(max_length=200)
+    code = models.CharField(max_length=20)
+    university = models.ForeignKey(University, on_delete=models.CASCADE)
+    teacher = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    description = models.TextField()
+    
+    def __str__(self):
+        return f"{self.code} - {self.title}"
 
-⦁ Accessibility and Security: A secure platform for accessing course content and managing student data, ideally meeting accessibility standards.
-⦁ Scalability: Capable of handling a large number of users and courses simultaneously.
-⦁ Integration: Integrating with other university systems and applications, possibly including campus services, library resources, and registration databases. This can vary widely based on the institution's setup.
-⦁ Customizability: Allowing institutions to adapt the platform to their specific needs and branding. This could include creating customized interfaces and integrating departmental specific tools.
-⦁ Mobile Accessibility: A responsive design often available to access courses and resources from mobile devices.
-⦁ Technical Support: Generally includes technical support for both faculty and students to address issues or provide guidance on using the system.
+class Enrollment(models.Model):
+    student = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE)
+    enrolled_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ('student', 'course')
+# views.py
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.core.exceptions import PermissionDenied
 
-Variations and Considerations:
+def role_check(role):
+    def check(user):
+        return user.role == role
+    return check
 
-⦁ Specific Institution Features: Different universities or colleges may customize or add specific tools or features to this platform implementations. Thus, not every installation has the same functionality.
-⦁ Versioning: This platform updates periodically, meaning new functionalities and user interface elements can appear.
-⦁ Third-Party Integrations: Integration with third-party tools and software may be possible, but these are often specific to institutional setups.
+@login_required
+@user_passes_test(role_check('creator'))
+def creator_dashboard(request):
+    # Only accessible to creator
+    universities = University.objects.all()
+    return render(request, 'creator_dashboard.html', {'universities': universities})
 
-In short, The platform's properties are centered around providing a comprehensive, secure, and accessible platform for managing and delivering online courses, fostering communication, and tracking student progress. However, the specific functionalities available are often shaped by the institution's configuration and needs.
+@login_required
+def university_portal(request):
+    if not request.user.university:
+        raise PermissionDenied
+    # University-specific content filtering
+    courses = Course.objects.filter(university=request.user.university)
+    return render(request, 'university_portal.html', {'courses': courses})
 
-Also include the system of adding universities with their own code of veiW  that means each university look only its own page in each university  the the Din looks all content in his university,the students' and teacher's page shall be  separated like:(Semera University,
-Gondar Universty,
-Bahir Dar University,
-Debrebirhan University,
-Debremarkos University,
-Debretabor University,
-WOLLO University,
-Woldiya University,
-Debark University,
-Mekdela Amba University,
-Injibara University,
-Haramaya University,
-Ambo University,
-Jimma University,
-Bule Horra University,
-Meda Welabu University,
-Metu University,
-Wollega University,
-Arsi University,
-Oda Bultum University,
-Selale University,
-Demba Dolo University,
-Jigiga University,
-Kebri Dehar University,
-Asossa University,
-Arba Minch University,
-Hawassa University,
-Dilla University,
-Mizan-Tepi University,
-Wachamo University,
-Wolayita Sodo University,
-Welketie University,
-Bonga University,
-Werabe University,
-Jinka University,
-Gambella University,
-Borana University,
-Defense University ). Also include: Let the students to look their own page
-Let the teachers to look their own page.
-Let the creator and the admin to look the same page.
-But, let the creator only to modify,to upgrade ,to add admin,to add courses, to add new and simpler feature.
-Also create strong security system especially for creator to prevent the web page or platform from hacking .
-Creat web link to get by search it in chrome.
-Also include secure and best monotization system(also creat a system to include local banks like CBE, Abay bank, Dashen bank).
-Also include transaction with icons(my profile, enrole on courses, add courses, drop courses, semister evaluation, request re assessment, request suplementary exam, request makeup exam, submit thesis title, request re admission, request withdrawal, select department, exit exam), report(enroied courses, course assessment, mark progress, time table, greade report ,my course, course drop history, withdrawal status, cours add, makeup exam, withdrawal report,outstanding students)
-, security (change user name change password), feedback, contact.
-Also add best logo for "Bics" educationnal platform or web page. creat web link to get "Bics" in chrome by search it and let the creator(me) to deploy it with changing web link and let the creator to administer the platform or web in full controle. Also include best login and signup system. Creat secure and special sign up and sign in for creator(me).Thanks!!!
+@login_required
+def student_dashboard(request):
+    if request.user.role != 'student':
+        raise PermissionDenied
+    enrollments = Enrollment.objects.filter(student=request.user)
+    return render(request, 'student_dashboard.html', {'enrollments': enrollments})
+# security.py - Custom security middleware
+from django.http import HttpResponseForbidden
+from django.utils.deprecation import MiddlewareMixin
+
+class UniversityAccessMiddleware(MiddlewareMixin):
+    def process_request(self, request):
+        if request.user.is_authenticated and request.user.university:
+            # Validate university access for all university-scoped URLs
+            if '/university/' in request.path:
+                university_id = request.path.split('/')[2]
+                if str(request.user.university.id) != university_id:
+                    return HttpResponseForbidden()# urls.py
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('creator/dashboard/', views.creator_dashboard, name='creator_dashboard'),
+    path('university/<int:university_id>/', views.university_portal, name='university_portal'),
+    path('student/dashboard/', views.student_dashboard, name='student_dashboard'),
+    
+    # Authentication paths
+    path('signup/', views.signup_view, name='signup'),
+    path('creator/signup/', views.creator_signup, name='creator_signup'),
+    path('login/', views.login_view, name='login'),
+    
+    # Transaction paths
+    path('payment/cbe/', views.cbe_payment, name='cbe_payment'),
+    path('payment/dashen/', views.dashen_payment, name='dashen_payment'),
+]<!-- Sample template: university_portal.html -->
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="university-header">
+  <h1>{{ request.user.university.name }} Portal</h1>
+  <!-- University-specific logo would go here -->
+</div>
+
+<div class="role-section">
+  {% if request.user.role == 'teacher' %}
+    <!-- Teacher view components -->
+    <div class="teacher-tools">
+      <button>Create Course</button>
+      <button>Grade Submissions</button>
+    </div>
+  
+  {% elif request.user.role == 'student' %}
+    <!-- Student view components -->
+    <div class="student-actions">
+      <button>Enroll in Courses</button>
+      <button>View Grades</button>
+      <button>Request Assessment</button>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+                    
+# Additional views for transactions, assessments, etc
+# Additional models for assessments, transactions, etc would go here 
